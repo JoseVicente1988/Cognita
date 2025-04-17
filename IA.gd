@@ -11,8 +11,8 @@ signal download_failed(error: String)  # Emitted if the download fails
 # ==============================================================================
 # Constants and Variables
 # ==============================================================================
-const REPO_URL = "https://raw.githubusercontent.com/JoseVicente1988/Cognita/main/Version.txt"  # Repository URL for version check
-const ZIP_URL = "https://github.com/JoseVicente1988/Cognita/archive/refs/heads/main.zip"  # URL for ZIP file download
+const REPO_URL = "https://raw.githubusercontent.com/JoseVicente1988/GodotIA/main/Version.txt"  # Repository URL for version check
+const ZIP_URL = "https://github.com/JoseVicente1988/GodotIA/archive/refs/heads/main.zip"  # URL for ZIP file download
 
 var zip_save_path := "res://Addons/Cognita-main/Temp/Addon_IA_update.zip"  # Path to save the downloaded ZIP
 var extraction_path := "res://Addons/"  # Path for extracting files

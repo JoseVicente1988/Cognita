@@ -7,7 +7,6 @@ extends Control
 const API_URL = "https://api.together.xyz/v1/completions"  # API endpoint URL
 var api_key = ""  # API key for authentication
 
-	
 # ==============================================================================
 # Variables
 # ==============================================================================
