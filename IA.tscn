@@ -1,0 +1,246 @@
+[gd_scene load_steps=9 format=3 uid="uid://ob73sktgnd1"]
+
+[sub_resource type="GDScript" id="GDScript_j2ds2"]
+script/source = "@tool
+extends Control
+
+# ==============================================================================
+# Constants
+# ==============================================================================
+const API_URL = \"https://api.together.xyz/v1/completions\"  # API endpoint URL
+var api_key = \"b5f1ee11e609525f205c18dfaa1e33e36ad9f714e0ac1a03b56cb8d79289c1f1\"  # API key for authentication
+
+# ==============================================================================
+# Variables
+# ==============================================================================
+var is_audio_enabled: bool = false  # Determines if responses will be read aloud
+var http_request = HTTPRequest.new()  # Node to handle HTTP requests
+@onready var lang = preload(\"res://Addons/Cognita-main/Lang.gd\").new() # Handles language localization
+
+
+# ==============================================================================
+# Initialization
+# ==============================================================================
+func _ready() -> void:
+	# Initialize language settings and add HTTPRequest to the scene tree
+	_initialize_language()
+	_add_http_request_to_tree()
+
+# ==============================================================================
+# User Interaction Handlers
+# ==============================================================================
+# Handle button press for sending queries
+func _on_button_pressed() -> void:
+	_send_user_query($VBoxContainer/HBoxContainer/LineEdit.text)
+
+
+# Handle text submission via LineEdit
+func _on_line_edit_text_submitted(new_text: String) -> void:
+	_send_user_query(new_text)
+
+
+# Toggle audio functionality through CheckBox
+func _on_check_box_toggled(is_checked: bool) -> void:
+	is_audio_enabled = is_checked
+
+# ==============================================================================
+# API Communication
+# ==============================================================================
+# Send a user query to the API
+func _send_user_query(prompt: String) -> void:
+	if prompt.strip_edges() == \"\":
+		print(\"Prompt is empty; no request sent.\")
+		return
+
+	# Define request headers and body
+	var headers = [
+		\"Authorization: Bearer %s\" % api_key,  # Include the API key for authentication
+		\"Content-Type: application/json\"
+	]
+	var request_body = {
+		\"role\": \"user\",
+		\"model\": \"meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8\",
+		\"prompt\": lang.translations[lang.language_selector()].get(\"prompt\") + prompt,
+		\"max_tokens\": 512,
+		\"temperature\": 1,
+	}
+
+	# Send the HTTP request
+	var error_code = http_request.request(API_URL, headers, HTTPClient.METHOD_POST, JSON.stringify(request_body))
+	if error_code != OK:
+		print(\"Failed to send request: \", error_code)
+
+# Process the response from the API
+func _on_http_request_completed(result: int, response_code: int, headers: PackedStringArray, body: PackedByteArray) -> void:
+	if result != HTTPRequest.RESULT_SUCCESS:
+		print(\"Connection error: \", result)
+		return
+
+	if response_code != 200:
+		print(\"HTTP error: \", response_code)
+		return
+
+	# Parse the response body
+	var json = JSON.new()
+	var parse_error = json.parse(body.get_string_from_utf8())
+	if parse_error != OK:
+		print(\"JSON parsing error: \", json.get_error_message())
+		return
+
+	# Extract and display the response text
+	var response_data = json.get_data()
+	if response_data and response_data.has(\"choices\") and response_data[\"choices\"].size() > 0:
+		var response_text = response_data[\"choices\"][0][\"text\"]
+		_update_interface_with_response(response_text)
+		_play_audio_response(response_text)
+		$VBoxContainer/HBoxContainer/LineEdit.text = \"\"
+
+	else:
+		_update_interface_with_error()
+
+# ==============================================================================
+# Helper Functions
+# ==============================================================================
+# Add the HTTPRequest node to the scene tree
+func _add_http_request_to_tree() -> void:
+	add_child(http_request)
+	http_request.request_completed.connect(_on_http_request_completed)
+
+# Play the response audio if audio is enabled
+func _play_audio_response(response_text: String) -> void:
+	if is_audio_enabled:
+		var voices = DisplayServer.tts_get_voices_for_language(lang.language_selector())
+		if voices.size() > 0:
+			DisplayServer.tts_speak(response_text, voices[0], 100)
+
+# Update the interface with the API response
+func _update_interface_with_response(response_text: String) -> void:
+	$VBoxContainer/Label.call_deferred(\"set_text\", \"[center]\" + response_text.strip_edges() + \"[/center]\")
+
+# Update the interface with an error message if the response is invalid
+func _update_interface_with_error() -> void:
+	$VBoxContainer/Label.text = str(lang.translations[lang.language_selector()].get(\"invalid\"))
+
+
+# ==============================================================================
+# Language Management
+# ==============================================================================
+# Initialize language settings
+func _initialize_language() -> void:
+	print(lang.language_selector())
+	$VBoxContainer/Label.bbcode_text = lang.translations[lang.language_selector()].get(\"welcome\")
+	$VBoxContainer/HBoxContainer/LineEdit.placeholder_text = lang.translations[lang.language_selector()].get(\"placeholder\")
+	$VBoxContainer/HBoxContainer/Button.text = lang.translations[lang.language_selector()].get(\"click_here\")
+"
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_i6kdk"]
+load_path = "res://.godot/imported/FondoIA.jpg-e211f61ad75ca9ff1d4daa8300c9eaa2.ctex"
+
+[sub_resource type="StyleBoxTexture" id="StyleBoxTexture_gluvu"]
+texture = SubResource("CompressedTexture2D_i6kdk")
+
+[sub_resource type="Theme" id="Theme_jtr7s"]
+RichTextLabel/styles/normal = SubResource("StyleBoxTexture_gluvu")
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_p8m7r"]
+load_path = "res://.godot/imported/audio.png-307bfd82641be6a4a8f2854a2d5362eb.ctex"
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_yuxap"]
+load_path = "res://.godot/imported/noaudio.png-9ea139d1a4cfad817ad90e191eab2e0f.ctex"
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_eftw6"]
+bg_color = Color(0, 0, 0, 0.501961)
+border_width_left = 5
+border_width_top = 5
+border_width_right = 5
+border_width_bottom = 5
+border_color = Color(0, 0, 0, 1)
+border_blend = true
+corner_radius_top_left = 15
+corner_radius_top_right = 15
+corner_radius_bottom_right = 15
+corner_radius_bottom_left = 15
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ve6ok"]
+bg_color = Color(0.988235, 0.921569, 0, 1)
+border_width_left = 5
+border_width_top = 5
+border_width_right = 5
+border_width_bottom = 5
+border_color = Color(0, 0, 0, 1)
+border_blend = true
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[node name="Node2D" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = SubResource("GDScript_j2ds2")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
+clip_contents = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Label" type="RichTextLabel" parent="VBoxContainer"]
+process_mode = 3
+layout_mode = 2
+size_flags_vertical = 3
+theme = SubResource("Theme_jtr7s")
+bbcode_enabled = true
+text = "Hola, soy Cognita. Tu compañero en Godot, me especializo en responder dudas o consultas que tengas. Disfruta de consultarme lo que necesites que te respondere tan rápido como pueda.
+
+Para empezar necesitas acceder a:
+[color=blue][url=https://www.together.ai]Haz clic aquí[/url][/color] (https://www.together.ai)
+
+Crea una cuenta, al crearla te dará una API, esta debes introducirlo en: Addon/Cognita/Llama3.gd - api_key
+
+Con este tendrás 60 peticiones por minuto de forma gratuita. ¡DISFRÚTALO!"
+scroll_following = true
+autowrap_mode = 2
+
+[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+
+[node name="CheckBox" type="CheckBox" parent="VBoxContainer/HBoxContainer"]
+clip_contents = true
+layout_mode = 2
+theme_override_icons/checked = SubResource("CompressedTexture2D_p8m7r")
+theme_override_icons/unchecked = SubResource("CompressedTexture2D_yuxap")
+icon_alignment = 1
+
+[node name="LineEdit" type="LineEdit" parent="VBoxContainer/HBoxContainer"]
+process_mode = 3
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/focus = SubResource("StyleBoxFlat_eftw6")
+theme_override_styles/read_only = SubResource("StyleBoxFlat_eftw6")
+theme_override_styles/normal = SubResource("StyleBoxFlat_eftw6")
+placeholder_text = "Consulta aquí"
+alignment = 1
+
+[node name="Button" type="Button" parent="VBoxContainer/HBoxContainer"]
+process_mode = 3
+layout_mode = 2
+theme_override_styles/focus = SubResource("StyleBoxFlat_ve6ok")
+theme_override_styles/hover_pressed_mirrored = SubResource("StyleBoxFlat_ve6ok")
+theme_override_styles/hover_pressed = SubResource("StyleBoxFlat_ve6ok")
+theme_override_styles/hover_mirrored = SubResource("StyleBoxFlat_ve6ok")
+theme_override_styles/hover = SubResource("StyleBoxFlat_ve6ok")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_ve6ok")
+theme_override_styles/normal = SubResource("StyleBoxFlat_ve6ok")
+text = "Preguntar"
+
+[connection signal="toggled" from="VBoxContainer/HBoxContainer/CheckBox" to="." method="_on_check_box_toggled"]
+[connection signal="text_submitted" from="VBoxContainer/HBoxContainer/LineEdit" to="." method="_on_line_edit_text_submitted"]
+[connection signal="pressed" from="VBoxContainer/HBoxContainer/Button" to="." method="_on_button_pressed"]
